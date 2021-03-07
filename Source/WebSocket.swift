@@ -437,7 +437,9 @@ private class Inflater {
                     break
                 }
                 strm.avail_in = CUnsignedInt(inflateEnd.count)
-                strm.next_in = UnsafePointer<UInt8>(inflateEnd)
+                inflateEnd.withUnsafeBytes { pointer in
+                    strm.next_in = pointer.baseAddress?.assumingMemoryBound(to: UInt8.self)
+                }
             }
             while true {
                 strm.avail_out = CUnsignedInt(bufsiz)
@@ -1047,8 +1049,16 @@ private class InnerWebSocket: Hashable {
         for i in 0 ..< 4 {
             keyb[i] = arc4random()
         }
-        let rkey = Data(bytes: UnsafePointer(keyb), count: 16).base64EncodedString(options: NSData.Base64EncodingOptions(rawValue: 0))
-        reqs += "Sec-WebSocket-Key: \(rkey)\r\n"
+        keyb.withUnsafeBytes { pointer in
+            guard let bytes = pointer.baseAddress?.assumingMemoryBound(to: [UInt32].self) else { return }
+            let rkey = Data(
+                bytes: bytes,
+                count: 16
+            ).base64EncodedString(
+                options: NSData.Base64EncodingOptions(rawValue: 0)
+            )
+            reqs += "Sec-WebSocket-Key: \(rkey)\r\n"
+        }
         reqs += "\r\n"
         var header = [UInt8]()
         for b in reqs.utf8 {
